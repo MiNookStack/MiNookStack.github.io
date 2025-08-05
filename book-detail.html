@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>米书 - 阅读</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <div class="logo-container">
+            <h1 class="logo">米书 <span class="logo-en">MiNook</span></h1>
+        </div>
+        <nav class="category-nav">
+            <a href="index.html?category=小说" data-category="小说">小说</a>
+            <a href="index.html?category=散文" data-category="散文">散文</a>
+            <a href="index.html?category=诗歌" data-category="诗歌">诗歌</a>
+            <a href="index.html?category=剧本" data-category="剧本">剧本</a>
+            <a href="index.html?category=测试" data-category="测试">测试</a>
+        </nav>
+        <div class="language-switcher">
+            <button id="lang-zh" class="lang-btn active">中</button>
+            <button id="lang-en" class="lang-btn">En</button>
+        </div>
+    </header>
+
+    <main class="book-detail-container">
+        <div class="book-info">
+            <h2 id="book-title" class="book-title">加载中...</h2>
+            <p id="book-meta" class="book-meta">加载中...</p>
+            <div id="book-description" class="book-description">加载中...</div>
+        </div>
+
+        <div id="chapter-selection" class="chapter-selection" style="display: none;">
+            <h3>章节列表</h3>
+            <ul id="chapters-list"></ul>
+        </div>
+
+        <div id="chapter-content" class="chapter-content">
+            <div class="loading">加载中...</div>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 米书 MiNook. 保留所有权利。</p>
+    </footer>
+
+    <script src="script.js"></script>
+    <script>
+        // 当页面加载完成后执行
+        document.addEventListener('DOMContentLoaded', function() {
+            // 获取URL参数
+            const urlParams = new URLSearchParams(window.location.search);
+            const bookPath = urlParams.get('book');
+            const chapterId = urlParams.get('chapter') || '1';
+
+            if (!bookPath) {
+                showNotification('无效的书籍路径');
+                return;
+            }
+
+            // 加载书籍信息
+            loadBookInfo(bookPath);
+
+            // 加载章节内容
+            loadChapterContent(bookPath, chapterId);
+
+            // 加载语言
+            loadLanguage();
+        });
+
+        // 加载书籍信息
+        function loadBookInfo(bookPath) {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', `${bookPath}/Information.txt`, true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        const infoContent = xhr.responseText;
+                        const infoLines = infoContent.split('\n');
+
+                        // 解析Information文件内容
+                        let bookTitle = '';
+                        let publishDate = '';
+                        let category = '';
+                        let description = '';
+
+                        infoLines.forEach(line => {
+                            if (line.startsWith('书名：')) {
+                                bookTitle = line.substring(3);
+                            } else if (line.startsWith('发布时间：')) {
+                                publishDate = line.substring(5);
+                            } else if (line.startsWith('所在分类：')) {
+                                category = line.substring(5);
+                            } else if (line.startsWith('简介：')) {
+                                description = line.substring(3);
+                            }
+                        });
+
+                        // 更新页面信息
+                        document.getElementById('book-title').textContent = bookTitle;
+                        document.getElementById('book-meta').textContent = `${publishDate} | ${category}`;
+                        document.getElementById('book-description').textContent = description;
+
+                        // 设置页面标题
+                        document.title = `米书 - ${bookTitle}`;
+
+                        // 加载章节列表
+                        loadChaptersList(bookPath);
+                    } else {
+                        showNotification('加载书籍信息失败');
+                    }
+                }
+            };
+            xhr.send();
+        }
+
+        // 加载章节列表
+        function loadChaptersList(bookPath) {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', bookPath, true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(xhr.responseText, 'text/html');
+
+                        // 查找所有.txt文件
+                        const chapterLinks = doc.querySelectorAll('a[href$=".txt"]');
+                        const chaptersList = document.getElementById('chapters-list');
+
+                        if (chapterLinks.length > 1) {
+                            // 显示章节选择
+                            document.getElementById('chapter-selection').style.display = 'block';
+
+                            // 清空章节列表
+                            chaptersList.innerHTML = '';
+
+                            // 添加章节链接
+                            chapterLinks.forEach(link => {
+                                const chapterName = link.innerText;
+                                const chapterId = chapterName.replace('.txt', '');
+                                const listItem = document.createElement('li');
+                                const anchor = document.createElement('a');
+                                anchor.href = `?book=${bookPath}&chapter=${chapterId}`;
+                                anchor.textContent = `第${chapterId}章`;
+                                anchor.addEventListener('click', function(e) {
+                                    e.preventDefault();
+                                    loadChapterContent(bookPath, chapterId);
+                                    // 更新URL而不刷新页面
+                                    history.pushState(null, null, this.href);
+                                    // 高亮当前章节
+                                    document.querySelectorAll('#chapters-list a').forEach(a => a.classList.remove('active'));
+                                    this.classList.add('active');
+                                });
+                                listItem.appendChild(anchor);
+                                chaptersList.appendChild(listItem);
+                            });
+
+                            // 高亮当前章节
+                            const currentChapter = new URLSearchParams(window.location.search).get('chapter') || '1';
+                            const currentLink = chaptersList.querySelector(`a[href*="chapter=${currentChapter}"]`);
+                            if (currentLink) {
+                                currentLink.classList.add('active');
+                            }
+                        }
+                    } else {
+                        console.error('加载章节列表失败');
+                    }
+                }
+            };
+            xhr.send();
+        }
+
+        // 加载章节内容
+        function loadChapterContent(bookPath, chapterId) {
+            const contentContainer = document.getElementById('chapter-content');
+            contentContainer.innerHTML = '<div class="loading">加载中...</div>';
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', `${bookPath}/${chapterId}.txt`, true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(xhr.responseText, 'text/html');
+
+                        // 提取章节内容
+                        const chapterTitle = doc.querySelector('h1')?.textContent || `第${chapterId}章`;
+                        const chapterContent = response;
+                        // 转换换行符为HTML换行
+                        const formattedContent = response.replace(/\n/g, '<br>');
+
+                        // 更新内容
+                        contentContainer.innerHTML = `
+                            <h3 class="chapter-title">${chapterTitle}</h3>
+                            <div class="content">${chapterContent}</div>
+                        `;
+                    } else {
+                        contentContainer.innerHTML = '<div class="error">章节内容加载失败</div>';
+                    }
+                }
+            };
+            xhr.send();
+        }
+    </script>
+</body>
+</html>
