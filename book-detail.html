@@ -182,19 +182,13 @@
             xhr.onreadystatechange = function() {
                 if (xhr.readyState === 4) {
                     if (xhr.status === 200) {
-                        const parser = new DOMParser();
-                        const doc = parser.parseFromString(xhr.responseText, 'text/html');
-
                         // 提取章节内容
-                        const chapterTitle = doc.querySelector('h1')?.textContent || `第${chapterId}章`;
-                        const chapterContent = response;
+                        const chapterTitle = `第${chapterId}章`;
                         // 转换换行符为HTML换行
-                        const formattedContent = response.replace(/\n/g, '<br>');
-
-                        // 更新内容
+                        const formattedContent = xhr.responseText.replace(/\n/g, '<br>');
                         contentContainer.innerHTML = `
                             <h3 class="chapter-title">${chapterTitle}</h3>
-                            <div class="content">${chapterContent}</div>
+                            <div class="content">${formattedContent}</div>
                         `;
                     } else {
                         contentContainer.innerHTML = '<div class="error">章节内容加载失败</div>';
